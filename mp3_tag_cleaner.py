@@ -379,11 +379,25 @@ def launch_gui():                                            # pragma: no cover
             self.title("MP3 乱码标签清理工具")
             self.geometry("1080x740")
             self.minsize(860, 560)
+            self._maximize()
             self.files: list[str] = []
             self.info: dict[str, dict] = {}
             # 打开后列表里只留有乱码的文件
             self.only_garbled = tk.BooleanVar(value=False)
             self._build()
+
+        # ---------------- 窗口 ----------------
+        def _maximize(self):
+            """启动时最大化窗口（Windows/Linux 用 zoomed，macOS 用 -zoomed）。"""
+            try:
+                self.state("zoomed")
+                return
+            except tk.TclError:
+                pass
+            try:
+                self.attributes("-zoomed", True)
+            except tk.TclError:
+                pass  # 不支持最大化时保持 geometry 的默认尺寸
 
         # ---------------- 布局 ----------------
         def _build(self):
