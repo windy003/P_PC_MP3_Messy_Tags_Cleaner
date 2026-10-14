@@ -12,14 +12,14 @@ MP3 乱码标签清理工具
 
 两种清理方式
 ------------
-1. 清除全部标签      —— 删掉整个 ID3v2 + ID3v1 标签（可选择保留封面图片）。
+1. 清除全部标签      —— 删掉整个 ID3v2 + ID3v1 标签（封面图片保留）。
                         最彻底，播放器一定显示文件名。
 2. 仅删除乱码标签    —— 只删被判定为乱码的那些字段，正常的标签保留。
 
 注意
 ----
-直接修改原文件，不生成备份，写入后无法撤销。不确定的话先点界面上的
-「预览结果」看一眼，或者自己先复制一份。
+直接修改原文件，不生成备份，写入后无法撤销。不确定的话先看界面中间的
+标签明细，或者自己先复制一份。
 
 运行
 ----
@@ -273,8 +273,7 @@ def write_id3v2(path: str, frames) -> None:
 # 清理动作
 # --------------------------------------------------------------------------
 
-def strip_all(path: str, keep_cover: bool = True, remove_v1: bool = True,
-              title_from_filename: bool = False) -> str:
+def strip_all(path: str, keep_cover: bool = True, remove_v1: bool = True) -> str:
     """清除全部标签。返回一句结果说明。"""
     info = analyze(path)
     if not info["has_v2"] and not info["has_v1"]:
@@ -287,16 +286,11 @@ def strip_all(path: str, keep_cover: bool = True, remove_v1: bool = True,
         except Exception:
             covers = []
 
-    new_frames = list(covers)
-    if title_from_filename:
-        from mutagen.id3 import TIT2
-        new_frames.append(TIT2(encoding=3, text=[os.path.splitext(os.path.basename(path))[0]]))
-
     removed_v2 = remove_id3v2_raw(path)
     removed_v1 = remove_id3v1_raw(path) if remove_v1 else False
 
-    if new_frames:
-        write_id3v2(path, new_frames)
+    if covers:
+        write_id3v2(path, covers)
 
     parts = []
     if removed_v2:
@@ -306,8 +300,6 @@ def strip_all(path: str, keep_cover: bool = True, remove_v1: bool = True,
     extra = []
     if keep_cover and covers:
         extra.append(f"保留封面 {len(covers)} 张")
-    if title_from_filename:
-        extra.append("标题=文件名")
     return "已删除 " + "+".join(parts) + ("（" + "，".join(extra) + "）" if extra else "")
 
 
@@ -405,9 +397,6 @@ def launch_gui():                                            # pragma: no cover
             toolbar.pack(fill="x")
             ttk.Button(toolbar, text="添加文件", command=self.add_files).pack(side="left")
             ttk.Button(toolbar, text="添加文件夹", command=self.add_folder).pack(side="left", padx=(6, 0))
-            ttk.Button(toolbar, text="移除选中", command=self.remove_selected).pack(side="left", padx=(6, 0))
-            ttk.Button(toolbar, text="清空列表", command=self.clear_all).pack(side="left", padx=(6, 0))
-            ttk.Button(toolbar, text="重新扫描", command=self.rescan).pack(side="left", padx=(6, 0))
             ttk.Checkbutton(toolbar, text="只看乱码文件", variable=self.only_garbled,
                             command=self.on_filter_toggle).pack(side="left", padx=(16, 0))
 
@@ -453,18 +442,13 @@ def launch_gui():                                            # pragma: no cover
             # --- 选项 + 操作 ---
             opts = ttk.Frame(self, padding=(10, 4))
             opts.pack(fill="x")
-            self.opt_cover = tk.BooleanVar(value=True)
             self.opt_v1 = tk.BooleanVar(value=True)
-            self.opt_rename = tk.BooleanVar(value=False)
-            ttk.Checkbutton(opts, text="保留封面图片", variable=self.opt_cover).pack(side="left")
-            ttk.Checkbutton(opts, text="同时清除 ID3v1", variable=self.opt_v1).pack(side="left", padx=12)
-            ttk.Checkbutton(opts, text="用文件名重建标题", variable=self.opt_rename).pack(side="left", padx=12)
+            ttk.Checkbutton(opts, text="同时清除 ID3v1", variable=self.opt_v1).pack(side="left")
 
             actions = ttk.Frame(self, padding=(10, 4))
             actions.pack(fill="x")
             ttk.Button(actions, text="清除全部标签", command=self.do_strip_all).pack(side="left")
             ttk.Button(actions, text="仅删除乱码标签", command=self.do_strip_garbled).pack(side="left", padx=(8, 0))
-            ttk.Button(actions, text="预览结果", command=self.do_preview).pack(side="left", padx=(8, 0))
 
             self.status = tk.StringVar(value="就绪。先添加文件，再选「清除全部标签」即可。")
             ttk.Label(self, textvariable=self.status, relief="sunken",
@@ -525,19 +509,6 @@ def launch_gui():                                            # pragma: no cover
                     self.files.append(p)
                     added += 1
             return added
-
-        def remove_selected(self):
-            # 从后往前删，否则前面的下标一移除，后面的就全错位了
-            for idx in sorted((int(i) for i in self.tree.selection()), reverse=True):
-                self.files.pop(idx)
-            self.rescan(keep_selection=False)
-
-        def clear_all(self):
-            self.files.clear()
-            self.info.clear()
-            self.tree.delete(*self.tree.get_children())
-            self.preview.delete(*self.preview.get_children())
-            self.status.set("已清空。")
 
         def rescan(self, keep_selection: bool = True) -> int:
             """重新读一遍所有文件的标签，再重建列表。"""
@@ -618,20 +589,6 @@ def launch_gui():                                            # pragma: no cover
                 self.preview.insert("", "end", values=("—", "—", "没有标签", "—"))
 
         # ---------------- 动作 ----------------
-        def do_preview(self):
-            paths = self.selected_paths()
-            bad = sum(1 for p in paths if self.info.get(p, {}).get("garbled"))
-            nolabel = sum(1 for p in paths if self.info.get(p, {}).get("status") == "无标签")
-            messagebox.showinfo(
-                "预览",
-                f"将处理 {len(paths)} 个文件：\n\n"
-                f"  含乱码标签：{bad}\n"
-                f"  本来就没标签（会跳过）：{nolabel}\n"
-                f"  其余正常：{len(paths) - bad - nolabel}\n\n"
-                f"勾选项：{'保留封面' if self.opt_cover.get() else '不保留封面'}，"
-                f"{'清除 ID3v1' if self.opt_v1.get() else '保留 ID3v1'}。\n\n"
-                f"注意：直接改写原文件，不做备份，无法撤销。")
-
         def _run(self, func):
             paths = self.selected_paths()
             if not paths:
@@ -658,8 +615,7 @@ def launch_gui():                                            # pragma: no cover
                 messagebox.showwarning("部分失败", summary + "\n详情见列表「状态」列。")
 
         def do_strip_all(self):
-            self._run(lambda p: strip_all(
-                p, self.opt_cover.get(), self.opt_v1.get(), self.opt_rename.get()))
+            self._run(lambda p: strip_all(p, True, self.opt_v1.get()))
 
         def do_strip_garbled(self):
             self._run(lambda p: strip_garbled(p))
