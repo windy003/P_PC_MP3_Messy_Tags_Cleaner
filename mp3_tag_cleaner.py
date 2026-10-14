@@ -18,20 +18,16 @@ MP3 乱码标签清理工具
 
 注意
 ----
-直接修改原文件，不生成备份，写入后无法撤销。不确定的话先跑只读的命令行模式
-看一眼（不加 --strip / --strip-garbled 就是只读），或者自己先复制一份。
+直接修改原文件，不生成备份，写入后无法撤销。不确定的话先点界面上的
+「预览结果」看一眼，或者自己先复制一份。
 
-用法
+运行
 ----
-    python mp3_tag_cleaner.py                 # 图形界面
-    python mp3_tag_cleaner.py a.mp3 b.mp3     # 命令行：只看不删
-    python mp3_tag_cleaner.py --strip *.mp3   # 命令行：清除全部标签
-    python mp3_tag_cleaner.py --strip-garbled *.mp3
+    python mp3_tag_cleaner.py     # 直接启动图形界面
 """
 
 from __future__ import annotations
 
-import argparse
 import os
 import shutil
 import sys
@@ -39,36 +35,18 @@ import sys
 try:
     from mutagen.id3 import ID3, APIC, COMM, USLT, TXXX, TextFrame, ID3NoHeaderError
 except ImportError:
-    sys.stderr.write(
-        "缺少 mutagen，请先安装：\n    pip install mutagen\n"
-    )
+    _msg = "缺少 mutagen，请先安装：\n\n    pip install mutagen"
+    try:
+        # 界面程序没有控制台，出错得弹窗告诉用户
+        import tkinter as tk
+        from tkinter import messagebox
+
+        _root = tk.Tk()
+        _root.withdraw()
+        messagebox.showerror("缺少依赖", _msg)
+    except Exception:
+        sys.stderr.write(_msg + "\n")
     raise SystemExit(1)
-
-
-def fix_console_encoding() -> None:
-    """让命令行能打印出乱码字符本身。
-
-    Windows 控制台默认是 GBK（cp936），而乱码文本里全是 `Ò¹Çú` 这种
-    GBK 编不出来的 Latin-1 字符，直接 print 会抛 UnicodeEncodeError ——
-    偏偏这些字符正是用户要看的东西。
-    """
-    encoding = None
-    if os.name == "nt":
-        try:
-            import ctypes
-
-            kernel32 = ctypes.windll.kernel32
-            kernel32.SetConsoleOutputCP(65001)
-            if kernel32.GetConsoleOutputCP() == 65001:
-                encoding = "utf-8"
-        except Exception:
-            pass
-    for stream in (sys.stdout, sys.stderr):
-        try:
-            # encoding=None 表示沿用原编码，只把报错改成替换
-            stream.reconfigure(encoding=encoding, errors="replace")
-        except Exception:
-            pass
 
 
 # --------------------------------------------------------------------------
@@ -675,48 +653,5 @@ def launch_gui():                                            # pragma: no cover
     App().mainloop()
 
 
-# ==========================================================================
-# 命令行
-# ==========================================================================
-
-def main(argv=None):
-    fix_console_encoding()
-    ap = argparse.ArgumentParser(
-        description="MP3 乱码标签清理：删掉乱码 ID3 标签，让播放器显示文件名。")
-    ap.add_argument("files", nargs="*", help="MP3 文件（支持通配符由 shell 展开）")
-    ap.add_argument("--strip", action="store_true", help="清除全部标签并写入")
-    ap.add_argument("--strip-garbled", action="store_true", help="只删除乱码标签并写入")
-    ap.add_argument("--no-cover", action="store_true", help="清除全部标签时不保留封面")
-    ap.add_argument("--keep-v1", action="store_true", help="清除全部标签时保留 ID3v1")
-    ap.add_argument("--title-from-name", action="store_true", help="用文件名重建标题")
-    ap.add_argument("--gui", action="store_true", help="强制打开图形界面")
-    args = ap.parse_args(argv)
-
-    if args.gui or not args.files:
-        launch_gui()
-        return 0
-
-    for pattern in args.files:
-        import glob
-        for path in (glob.glob(pattern) or [pattern]):
-            if not os.path.isfile(path):
-                print(f"[跳过] 找不到 {path}")
-                continue
-            if args.strip:
-                print(f"[{strip_all(path, not args.no_cover, not args.keep_v1, args.title_from_name)}] {path}")
-            elif args.strip_garbled:
-                print(f"[{strip_garbled(path)}] {path}")
-            else:
-                info = analyze(path)
-                print(f"\n=== {info['name']} ===  状态：{info['status']}")
-                for fid, label, value, bad in info["frames"]:
-                    print(f"  {'!!' if bad else '  '} {fid:<6} {label:<8} {value[:90]}")
-                for name, text, bad in info["v1_fields"]:
-                    print(f"  {'!!' if bad else '  '} ID3v1  {name:<8} {text[:90]}")
-                if not info["frames"] and not info["v1_fields"]:
-                    print("  (没有标签)")
-    return 0
-
-
 if __name__ == "__main__":
-    raise SystemExit(main())
+    launch_gui()

@@ -7,7 +7,7 @@
 ## 运行
 
 ```bat
-双击 启动清理工具.bat
+双击 run.bat
 ```
 或者：
 
@@ -15,6 +15,7 @@
 python mp3_tag_cleaner.py
 ```
 
+程序只有图形界面，没有命令行参数；双击后直接出窗口，所有操作都在界面里完成。
 依赖只有一个：`pip install mutagen`（本机已装 1.47.0）。
 
 ## 界面用法
@@ -41,21 +42,7 @@ python mp3_tag_cleaner.py
 - **用文件名重建标题** —— 如果你想让播放器显示得好看点，可以顺手把标题写成文件名。
 
 > **写入是直接改原文件，不做备份，无法撤销。** 不放心就先自己复制一份，
-> 或者先用只读模式（见下）看一眼会删掉什么。
-
-## 命令行
-
-```bat
-python mp3_tag_cleaner.py 专辑\*.mp3              只看不删，打印每个文件的标签
-python mp3_tag_cleaner.py --strip 专辑\*.mp3      清除全部标签
-python mp3_tag_cleaner.py --strip-garbled *.mp3   只删乱码
-```
-
-**不加 `--strip` / `--strip-garbled` 就是只读模式**，只打印不改文件，
-适合先看看这批文件到底什么情况。
-
-其它开关：`--no-cover`（清除全部标签时不保留封面）、`--keep-v1`（保留 ID3v1）、
-`--title-from-name`（用文件名重建标题）。
+> 或者先点「预览结果」看一眼会删掉什么。
 
 ## 乱码是怎么判定的
 
@@ -95,5 +82,6 @@ python -I _test\run_tests.py
 
 ```bat
 python _test\make_one.py _test\data\sample.mp3
-python mp3_tag_cleaner.py _test\data\sample.mp3
 ```
+
+然后启动界面，把 `_test\data\sample.mp3` 添加进去看明细。

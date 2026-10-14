@@ -1,5 +1,5 @@
 @echo off
-rem Double-click launcher for mp3_tag_cleaner.py
+rem Double-click launcher for mp3_tag_cleaner.py (graphical interface only)
 cd /d "%~dp0"
-python "%~dp0mp3_tag_cleaner.py" %*
+python "%~dp0mp3_tag_cleaner.py"
 if errorlevel 1 pause
